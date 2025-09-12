@@ -68,12 +68,17 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, o
                         <img 
                           src={template.preview} 
                           alt={template.name} 
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4">
                           <div className="text-white">
-                            <h3 className="text-lg font-bold">{template.name}</h3>
-                            <p className="text-sm text-gray-200">{template.description}</p>
+                            <h3 className="text-lg font-bold mb-2">{template.name}</h3>
+                            <p className="text-sm text-gray-200 mb-2">{template.description}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">60fps</span>
+                              <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">Interactive</span>
+                              <span className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-bold">Responsive</span>
+                            </div>
                           </div>
                         </div>
                         {selectedTemplate === template.id && (
@@ -85,9 +90,11 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, o
                         )}
                       </div>
                       <div className="p-4 bg-white dark:bg-gray-800 flex-1">
+                        <h4 className="font-bold text-gray-900 dark:text-white mb-2">{template.name}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{template.description}</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {template.features.map((feature, i) => (
-                            <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm">
                               {feature}
                             </span>
                           ))}
@@ -98,10 +105,10 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, o
                 </div>
               </div>
               <button
-                className="mt-8 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                className="mt-8 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl"
                 onClick={handleClose}
               >
-                Confirm Selection
+                ✨ Confirm World-Class Template
               </button>
             </motion.div>
           </motion.div>

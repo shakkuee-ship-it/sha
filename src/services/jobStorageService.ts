@@ -1,4 +1,6 @@
 // Job Storage Service for offline functionality
+import { defaultJobs } from '../data/defaultJobs';
+
 export interface StoredJob {
   id: string;
   title: string;
@@ -38,10 +40,20 @@ export class JobStorageService {
   static getStoredJobs(): StoredJob[] {
     try {
       const stored = localStorage.getItem(JOBS_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
+      const storedJobs = stored ? JSON.parse(stored) : [];
+      
+      // If no stored jobs, return default jobs
+      if (storedJobs.length === 0) {
+        this.saveJobs(defaultJobs);
+        return defaultJobs;
+      }
+      
+      return storedJobs;
     } catch (error) {
       console.error('Error loading jobs from storage:', error);
-      return [];
+      // Return default jobs on error
+      this.saveJobs(defaultJobs);
+      return defaultJobs;
     }
   }
 
@@ -91,8 +103,15 @@ export class JobStorageService {
     const storedJobs = this.getStoredJobs();
     const localJobs = storedJobs.filter(job => job.isLocal);
     
-    // Remove old API jobs and keep only local jobs, then add new API jobs
-    const mergedJobs = [...apiJobs, ...localJobs];
+    // If no API jobs, return stored jobs (including defaults)
+    if (!apiJobs || apiJobs.length === 0) {
+      return storedJobs;
+    }
+    
+    // Merge API jobs with local jobs and defaults
+    const mergedJobs = [...apiJobs, ...localJobs, ...defaultJobs.filter(defaultJob => 
+      !localJobs.some(localJob => localJob.id === defaultJob.id)
+    )];
     
     // Save the merged list
     this.saveJobs(mergedJobs);
@@ -114,5 +133,18 @@ export class JobStorageService {
   static clearAllJobs(): void {
     localStorage.removeItem(JOBS_STORAGE_KEY);
     localStorage.removeItem(LAST_SYNC_KEY);
+  }
+
+  // Initialize default jobs if none exist
+  static initializeDefaultJobs(): void {
+    const existingJobs = this.getStoredJobs();
+    if (existingJobs.length === 0) {
+      this.saveJobs(defaultJobs);
+    }
+  }
+  
+  // Get default jobs
+  static getDefaultJobs(): StoredJob[] {
+    return defaultJobs;
   }
 }

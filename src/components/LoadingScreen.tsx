@@ -14,7 +14,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 }) => {
   const [currentMessage, setCurrentMessage] = useState(message);
   const [dots, setDots] = useState('');
-  const [animationPhase, setAnimationPhase] = useState(0);
 
   const loadingMessages = [
     "🐼 Initializing CareerPanda...",
@@ -26,14 +25,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
   useEffect(() => {
     if (!isLoading) return;
-
-    // Animation sequence
-    const animationTimeline = [
-      setTimeout(() => setAnimationPhase(1), 800),    // Circle morphs to face
-      setTimeout(() => setAnimationPhase(2), 1500),   // Eyes appear
-      setTimeout(() => setAnimationPhase(3), 2200),   // Smile appears with bounce
-      setTimeout(() => setAnimationPhase(4), 3000),   // Face shakes/nods
-    ];
 
     const messageInterval = setInterval(() => {
       setCurrentMessage(prev => {
@@ -51,59 +42,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     }, 2000);
 
     return () => {
-      animationTimeline.forEach(timer => clearTimeout(timer));
       clearInterval(messageInterval);
       clearInterval(dotsInterval);
       clearTimeout(initialDelay);
     };
   }, [isLoading]);
-
-  // Face morphing variants
-  const faceVariants = {
-    circle: {
-      d: "M50 10 A40 40 0 1 1 50 90 A40 40 0 1 1 50 10",
-      transition: { duration: 0.8, ease: "easeInOut" }
-    },
-    face: {
-      d: "M50 15 C70 15 85 30 85 50 C85 70 70 85 50 85 C30 85 15 70 15 50 C15 30 30 15 50 15",
-      transition: { duration: 0.8, ease: "easeInOut" }
-    }
-  };
-
-  // Eye animations
-  const eyeVariants = {
-    hidden: { scale: 0, opacity: 0 },
-    visible: {
-      scale: 1,
-      opacity: 1,
-      transition: { duration: 0.4, ease: "backOut" }
-    }
-  };
-
-  // Smile animation
-  const smileVariants = {
-    hidden: { pathLength: 0, opacity: 0, scale: 0.5 },
-    visible: {
-      pathLength: 1,
-      opacity: 1,
-      scale: 1,
-      transition: { 
-        duration: 0.6, 
-        ease: "easeOut",
-        scale: { type: "spring", damping: 10, stiffness: 200 }
-      }
-    }
-  };
-
-  // Face shake/nod animation
-  const faceShakeVariants = {
-    still: { rotate: 0, y: 0 },
-    nodding: {
-      rotate: [0, -2, 2, -1, 1, 0],
-      y: [0, -2, 0, -1, 0],
-      transition: { duration: 1.2, ease: "easeInOut" }
-    }
-  };
 
   if (!isLoading) return null;
 
@@ -144,88 +87,48 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
         {/* Main Loading Content - Responsive */}
         <div className="relative z-10 text-center px-4 w-full max-w-lg">
-          {/* Animated Face Logo */}
+          {/* CareerPanda Logo Animation - Responsive */}
           <motion.div
-            className="mb-6 sm:mb-8 mx-auto w-24 h-24 sm:w-32 sm:h-32 relative"
-            variants={faceShakeVariants}
-            animate={animationPhase >= 4 ? "nodding" : "still"}
+            initial={{ scale: 0, rotate: -180, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ 
+              duration: 2.5, 
+              ease: [0.16, 1, 0.3, 1],
+              rotate: { 
+                type: 'spring',
+                damping: 10,
+                stiffness: 60,
+                mass: 1.5
+              }
+            }}
+            className="mb-6 sm:mb-8"
           >
-            <svg width="100%" height="100%" viewBox="0 0 100 100" className="glow">
-              <defs>
-                <linearGradient id="faceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00f3ff" />
-                  <stop offset="50%" stopColor="#9d4edd" />
-                  <stop offset="100%" stopColor="#ff006e" />
-                </linearGradient>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                  <feMerge> 
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
+            <div className="relative">
+              {/* Responsive Panda Logo */}
+              <motion.div
+                animate={{ 
+                  rotate: [0, 8, -8, 0],
+                  scale: [1, 1.08, 1],
+                  y: [0, -5, 0]
+                }}
+                transition={{ 
+                  duration: 3,
+                  repeat: Infinity,
+                  repeatType: 'reverse',
+                  ease: [0.4, 0, 0.2, 1]
+                }}
+                className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 bg-gradient-to-br from-white to-gray-100 rounded-full flex items-center justify-center shadow-2xl"
+              >
+                <div className="text-4xl sm:text-6xl">🐼</div>
+              </motion.div>
               
-              {/* Face outline */}
-              <motion.path
-                variants={faceVariants}
-                initial="circle"
-                animate={animationPhase >= 1 ? "face" : "circle"}
-                fill="none"
-                stroke="url(#faceGradient)"
-                strokeWidth="3"
-                filter="url(#glow)"
+              {/* Responsive Glowing Ring */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 w-24 h-24 sm:w-32 sm:h-32 mx-auto border-2 sm:border-4 border-transparent border-t-white/50 border-r-blue-400/50 rounded-full"
               />
-
-              {/* Eyes */}
-              <motion.circle
-                cx="38"
-                cy="42"
-                r="3"
-                fill="#00f3ff"
-                variants={eyeVariants}
-                initial="hidden"
-                animate={animationPhase >= 2 ? "visible" : "hidden"}
-              />
-              <motion.circle
-                cx="62"
-                cy="42"
-                r="3"
-                fill="#00f3ff"
-                variants={eyeVariants}
-                initial="hidden"
-                animate={animationPhase >= 2 ? "visible" : "hidden"}
-              />
-
-              {/* Smile */}
-              <motion.path
-                d="M35 60 Q50 75 65 60"
-                fill="none"
-                stroke="#ff006e"
-                strokeWidth="3"
-                strokeLinecap="round"
-                variants={smileVariants}
-                initial="hidden"
-                animate={animationPhase >= 3 ? "visible" : "hidden"}
-              />
-            </svg>
-            
-            {/* Pulsing glow around face */}
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: "radial-gradient(circle, rgba(0,243,255,0.2) 0%, transparent 70%)"
-              }}
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.6, 0.3]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            />
+            </div>
           </motion.div>
 
           {/* Responsive Brand Name */}

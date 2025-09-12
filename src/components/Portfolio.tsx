@@ -73,27 +73,27 @@ const Portfolio: React.FC = () => {
   const templates = [
     {
       id: 0,
-      name: "Cyberpunk Matrix",
-      description: "Futuristic cyberpunk design with matrix rain, glitch effects, and neon aesthetics",
+      name: "Cyberpunk Nexus",
+      description: "Ultra-modern cyberpunk experience with Netflix-style browsing, matrix rain, custom cursors, and cinematic animations",
       image: "https://images.pexels.com/photos/546819/pexels-photo-546819.jpeg?auto=compress&cs=tinysrgb&w=400",
       color: "from-green-400 to-cyan-400",
-      features: ["Matrix Rain Effect", "Custom Cursor", "Glitch Animations", "Neon Glow", "Hexagonal Grid"]
+      features: ["Matrix Rain Effect", "Custom Cursor Trails", "Netflix-Style Scrolling", "Cinematic Modals", "60fps Animations", "Responsive Touch Controls"]
     },
     {
       id: 1,
-      name: "Holographic Nexus",
-      description: "Interdimensional holographic design with morphing elements and particle systems",
+      name: "Cosmic Odyssey",
+      description: "Space adventure portfolio with floating planet navigation, constellation skills, and RPG-style project exploration",
       image: "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=400",
       color: "from-purple-500 to-pink-500",
-      features: ["Holographic Effects", "Morphing Cards", "Particle System", "3D Transforms", "Liquid Animations"]
+      features: ["Floating Planet Navigation", "Constellation Skills", "RPG Adventure Cards", "Particle Systems", "3D Transforms", "Touch Gestures"]
     },
     {
       id: 2,
-      name: "Quantum Dimension",
-      description: "Multidimensional quantum-inspired design with geometric shapes and energy waves",
+      name: "Mystic Realm",
+      description: "Fantasy storybook portfolio with spell book navigation, magical crystals, and enchanted scroll animations",
       image: "https://images.pexels.com/photos/2387873/pexels-photo-2387873.jpeg?auto=compress&cs=tinysrgb&w=400",
       color: "from-red-500 to-yellow-500",
-      features: ["Quantum Effects", "Geometric Animations", "Energy Waves", "Dimensional Cards", "Spiral Layout"]
+      features: ["Spell Book Navigation", "Magic Crystal Skills", "Adventure Map Projects", "Storybook Experience", "Enchanted Animations", "Fantasy UI"]
     }
   ];
 
@@ -144,7 +144,7 @@ const Portfolio: React.FC = () => {
       
       const templateNames = ['cyberpunk', 'holographic', 'quantum'];
       downloadPortfolio(portfolioData, templateNames[selectedTemplate]);
-      toast.success(`🚀 ${templates[selectedTemplate].name} portfolio downloaded! This is next-level stuff!`);
+      toast.success(`🚀 ${templates[selectedTemplate].name} portfolio downloaded! World-class interactive experience ready!`);
     } catch (error) {
       toast.error('Error generating portfolio. Please try again.');
       console.error('Portfolio generation error:', error);
@@ -161,7 +161,7 @@ const Portfolio: React.FC = () => {
       if (previewWindow) {
         previewWindow.document.write(htmlContent);
         previewWindow.document.close();
-        toast.success(`🎨 ${templates[selectedTemplate].name} preview opened! Prepare to be amazed!`);
+        toast.success(`🎨 ${templates[selectedTemplate].name} preview opened! Experience the world-class interactive portfolio!`);
       }
     } catch (error) {
       toast.error('Error previewing portfolio. Please try again.');
@@ -174,6 +174,8 @@ const Portfolio: React.FC = () => {
       const savedData = localStorage.getItem('resumeData');
       if (savedData) {
         const resumeData = JSON.parse(savedData);
+        
+        // Enhanced data mapping with better field extraction
         setPortfolioData({
           personalInfo: {
             name: resumeData.personalInfo?.name || '',
@@ -184,10 +186,25 @@ const Portfolio: React.FC = () => {
             linkedin: resumeData.personalInfo?.linkedin || '',
             github: resumeData.personalInfo?.github || ''
           },
-          skills: resumeData.skills || [],
-          projects: resumeData.projects || [],
-          experience: resumeData.experience || [],
-          education: resumeData.education || []
+          skills: Array.isArray(resumeData.skills) ? resumeData.skills : [],
+          projects: Array.isArray(resumeData.projects) ? resumeData.projects.map((project: any) => ({
+            name: project.name || project.title || '',
+            description: project.description || '',
+            technologies: project.technologies || project.tech || project.stack || '',
+            link: project.link || project.url || project.github || ''
+          })) : [],
+          experience: Array.isArray(resumeData.experience) ? resumeData.experience.map((exp: any) => ({
+            title: exp.title || exp.position || '',
+            company: exp.company || exp.organization || '',
+            duration: exp.duration || exp.period || exp.dates || '',
+            description: exp.description || exp.responsibilities || ''
+          })) : [],
+          education: Array.isArray(resumeData.education) ? resumeData.education.map((edu: any) => ({
+            degree: edu.degree || edu.qualification || '',
+            institution: edu.institution || edu.school || edu.university || '',
+            year: edu.year || edu.period || edu.duration || '',
+            gpa: edu.gpa || edu.grade || edu.marks || ''
+          })) : []
         });
         toast.success('Resume data loaded for portfolio generation!');
       } else {
@@ -452,8 +469,8 @@ const Portfolio: React.FC = () => {
           </h2>
           
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Create a professional portfolio website that highlights your projects, skills, and achievements. 
-            Automatically generated and hosted for free.
+            Create world-class interactive portfolios that combine Netflix-style browsing, 2D RPG exploration, and cinematic storytelling. 
+            Each template features advanced animations, responsive design, and immersive user experiences at 60fps.
           </p>
         </motion.div>
 
@@ -726,7 +743,7 @@ const Portfolio: React.FC = () => {
           </motion.button>
           
           <p className="text-gray-600 dark:text-gray-300 mt-4">
-            Your portfolio will be ready in seconds! Perfect for job applications and networking.
+            Your world-class interactive portfolio will be ready in seconds! Features cinematic animations, responsive design, and immersive storytelling perfect for standing out to employers.
           </p>
         </motion.div>
       </div>
