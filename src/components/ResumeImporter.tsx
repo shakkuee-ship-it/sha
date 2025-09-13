@@ -1,108 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, CheckCircle, X, Brain, Download, User, Briefcase, BookOpen, Code, MapPin, Phone, Mail, Globe, ChevronRight } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Upload, FileText, CheckCircle, AlertCircle, X, Brain, Loader } from 'lucide-react';
+import { ResumeData } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-
-// Define the ResumeData interface
-interface PersonalInfo {
-  name: string;
-  email: string;
-  phone: string;
-  location: string;
-  summary: string;
-  linkedin: string;
-  github: string;
-  portfolio: string;
-}
-
-interface Experience {
-  title: string;
-  company: string;
-  duration: string;
-  description: string;
-  location: string;
-}
-
-interface Education {
-  degree: string;
-  institution: string;
-  year: string;
-  gpa: string;
-  location: string;
-  honors: string;
-}
-
-interface Project {
-  name: string;
-  description: string;
-  technologies: string[];
-  link: string;
-  duration: string;
-}
-
-export interface ResumeData {
-  personalInfo: PersonalInfo;
-  experience: Experience[];
-  education: Education[];
-  skills: string[];
-  projects: Project[];
-  certifications: string[];
-  languages: string[];
-}
 
 interface ResumeImporterProps {
   onDataImported: (data: ResumeData) => void;
   onClose: () => void;
 }
 
-// Declare pdfjsLib with type any since we're loading it from a CDN
-declare const pdfjsLib: any;
-
 const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [extractedData, setExtractedData] = useState<ResumeData | null>(null);
+  const [extractedText, setExtractedText] = useState<string>('');
   const [processingStep, setProcessingStep] = useState<string>('');
   const [showManualInput, setShowManualInput] = useState<boolean>(false);
   const [manualText, setManualText] = useState<string>('');
-  const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
-  const [confidenceScore, setConfidenceScore] = useState<number>(0);
-  const [parsingTime, setParsingTime] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load pdf.js library on component mount
-  useEffect(() => {
-    // Check if pdfjsLib is already available
-    if (typeof pdfjsLib !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      setPdfjsLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
-    script.async = true;
-    script.onload = () => {
-      // Set the worker path
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      setPdfjsLoaded(true);
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      if (script.parentNode) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+    if (e.type === 'dragenter' || e.type === 'dragleave' || e.type === 'dragover') {
+      setDragActive(e.type !== 'dragleave');
     }
   };
 
@@ -121,73 +42,15 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
     }
   };
 
-  // Extract text from PDF using pdf.js with layout preservation
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const fileReader = new FileReader();
-      
-      fileReader.onload = async (event) => {
-        try {
-          const arrayBuffer = event.target?.result as ArrayBuffer;
-          if (!arrayBuffer) {
-            reject(new Error('Failed to read file'));
-            return;
-          }
-          
-          // Load the PDF document
-          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-          const pdf = await loadingTask.promise;
-          
-          let extractedText = '';
-          
-          // Extract text from each page with layout preservation
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            
-            // Sort text items by y position (top to bottom) and x position (left to right)
-            const textItems = textContent.items.sort((a: any, b: any) => {
-              if (a.transform[5] !== b.transform[5]) {
-                return b.transform[5] - a.transform[5]; // Sort by y position (descending)
-              }
-              return a.transform[4] - b.transform[4]; // Then by x position
-            });
-            
-            let lastY = 0;
-            for (const item of textItems) {
-              // Add newline when we detect a significant vertical movement
-              if (Math.abs(item.transform[5] - lastY) > 5) {
-                extractedText += '\n';
-                lastY = item.transform[5];
-              }
-              extractedText += item.str + ' ';
-            }
-            extractedText += '\n\n'; // Separate pages with extra newlines
-          }
-          
-          resolve(extractedText);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      fileReader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      
-      fileReader.readAsArrayBuffer(file);
-    });
-  };
-
   const handleFile = async (file: File) => {
-    console.log('Handling file:', file.name, 'Type:', file.type, 'Size:', file.size);
+    console.log('Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
     
-    const allowedTypes = ['application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    const allowedExtensions = ['.pdf', '.txt', '.docx'];
+    const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx'];
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
     
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
-      toast.error(`Invalid file type. Please upload a PDF, TXT, or DOCX file.`);
+      toast.error('Invalid file type. Please upload PDF, DOC, DOCX, or TXT files.');
       return;
     }
     
@@ -197,53 +60,35 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
     }
     
     setUploading(true);
-    setProcessingStep('Reading file...');
+    setProcessingStep('Reading file content...');
     
     try {
       let text = '';
-      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       
-      if (isPDF) {
-        if (!pdfjsLoaded) {
-          toast.error('PDF library is still loading. Please try again in a moment.');
-          setUploading(false);
-          return;
-        }
-        
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         setProcessingStep('Extracting text from PDF...');
         text = await extractTextFromPDF(file);
-      } else if (file.name.toLowerCase().endsWith('.docx')) {
-        setProcessingStep('DOCX files require special handling. Please paste text manually.');
-        setShowManualInput(true);
-        setUploading(false);
-        return;
+      } else if (file.type.includes('word') || file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')) {
+        setProcessingStep('Processing Word document...');
+        text = await extractTextFromWord(file);
       } else {
-        // Handle text files directly
         setProcessingStep('Reading text file...');
-        text = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string || '');
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsText(file);
-        });
+        text = await extractTextFromFile(file);
       }
       
-      if (!text || text.trim().length < 10) {
-        throw new Error('No readable text found in the file. The PDF might be scanned or image-based.');
+      if (!text || text.trim().length < 50) {
+        throw new Error('Unable to extract meaningful text from the file. Please try a different file or use manual input.');
       }
       
-      setProcessingStep('Analyzing content with AI...');
-      const startTime = performance.now();
-      const { parsedData, confidence } = await parseResumeTextAdvanced(text);
-      const endTime = performance.now();
+      setExtractedText(text);
+      setProcessingStep('Analyzing resume content with AI...');
       
-      setParsingTime(Math.round(endTime - startTime));
+      const parsedData = await parseResumeWithAdvancedAI(text);
       setExtractedData(parsedData);
-      setConfidenceScore(confidence);
-      toast.success(`Resume data extracted with ${confidence}% confidence!`);
+      toast.success('Resume data extracted successfully!');
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('Error processing file:', error);
       toast.error(`Error: ${errorMessage}`);
     } finally {
@@ -252,14 +97,117 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
     }
   };
 
-  // Advanced resume parsing function with improved algorithms
-  const parseResumeTextAdvanced = async (text: string): Promise<{ parsedData: ResumeData, confidence: number }> => {
-    // Preprocess text - preserve line breaks for section detection
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const normalizedText = lines.join('\n');
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    // Try multiple PDF extraction methods
+    try {
+      // Method 1: Try server-side extraction first
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/parse-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.text && data.text.trim().length > 50) {
+          return data.text;
+        }
+      }
+    } catch (error) {
+      console.log('Server-side PDF extraction failed, trying client-side...');
+    }
+
+    // Method 2: Client-side PDF extraction using pdf-parse alternative
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Simple PDF text extraction (basic implementation)
+          const text = await extractPDFTextBasic(uint8Array);
+          if (text && text.trim().length > 50) {
+            resolve(text);
+          } else {
+            reject(new Error('Could not extract text from PDF. Please try converting to text format first.'));
+          }
+        } catch (error) {
+          reject(new Error('Failed to process PDF file. Please try a text version.'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read PDF file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const extractPDFTextBasic = async (uint8Array: Uint8Array): Promise<string> => {
+    // Basic PDF text extraction - looks for text between BT and ET markers
+    const decoder = new TextDecoder('utf-8');
+    const pdfText = decoder.decode(uint8Array);
     
-    let confidence = 80; // Base confidence score
+    // Extract text content using regex patterns
+    const textMatches = pdfText.match(/\(([^)]+)\)/g);
+    if (textMatches) {
+      return textMatches
+        .map(match => match.slice(1, -1))
+        .join(' ')
+        .replace(/\\[rn]/g, '\n')
+        .replace(/\\/g, '');
+    }
     
+    // Fallback: extract readable text
+    const readableText = pdfText.replace(/[^\x20-\x7E\n]/g, ' ').replace(/\s+/g, ' ');
+    return readableText;
+  };
+
+  const extractTextFromWord = async (file: File): Promise<string> => {
+    // For Word documents, we'll read as text and extract what we can
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          // Basic Word document text extraction
+          const cleanText = content
+            .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+            .replace(/[^\x20-\x7E\n]/g, ' ') // Keep only printable ASCII
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          
+          if (cleanText.length > 50) {
+            resolve(cleanText);
+          } else {
+            reject(new Error('Could not extract meaningful text from Word document'));
+          }
+        } catch (error) {
+          reject(new Error('Failed to process Word document'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read Word document'));
+      reader.readAsText(file);
+    });
+  };
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        if (text && text.trim().length > 10) {
+          resolve(text);
+        } else {
+          reject(new Error('File appears to be empty or unreadable'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const parseResumeWithAdvancedAI = async (text: string): Promise<ResumeData> => {
     const resumeData: ResumeData = {
       personalInfo: {
         name: '',
@@ -268,425 +216,343 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
         location: '',
         summary: '',
         linkedin: '',
-        github: '',
-        portfolio: ''
+        github: ''
       },
       experience: [],
       education: [],
       skills: [],
-      projects: [],
-      certifications: [],
-      languages: []
+      projects: []
     };
 
-    // Section detection using advanced patterns
-    const sections = detectSections(normalizedText, lines);
+    // Advanced text preprocessing
+    const cleanText = text
+      .replace(/\s+/g, ' ')
+      .replace(/[^\x20-\x7E\n]/g, ' ')
+      .trim();
     
-    // Extract personal information with improved algorithms
-    const personalInfo = extractPersonalInfo(normalizedText, lines);
-    resumeData.personalInfo = { ...resumeData.personalInfo, ...personalInfo };
-    
-    // Extract experience with context awareness
-    if (sections.experience) {
-      resumeData.experience = extractExperience(sections.experience);
-      confidence += resumeData.experience.length > 0 ? 5 : 0;
-    }
-    
-    // Extract education with improved patterns
-    if (sections.education) {
-      resumeData.education = extractEducation(sections.education);
-      confidence += resumeData.education.length > 0 ? 5 : 0;
-    }
-    
-    // Extract skills with better categorization
-    if (sections.skills) {
-      resumeData.skills = extractSkills(sections.skills);
-      confidence += resumeData.skills.length > 0 ? 5 : 0;
-    }
-    
-    // Extract projects with enhanced detection
-    if (sections.projects) {
-      resumeData.projects = extractProjects(sections.projects);
-      confidence += resumeData.projects.length > 0 ? 5 : 0;
-    }
-    
-    // Extract certifications
-    if (sections.certifications) {
-      resumeData.certifications = extractCertifications(sections.certifications);
-    }
-    
-    // Extract languages
-    if (sections.languages) {
-      resumeData.languages = extractLanguages(sections.languages);
-    }
-    
-    // If summary wasn't found in a section, try to extract it from the beginning
-    if (!resumeData.personalInfo.summary && lines.length > 3) {
-      const possibleSummary = extractSummary(lines);
-      if (possibleSummary) {
-        resumeData.personalInfo.summary = possibleSummary;
-      }
-    }
-    
-    // Cap confidence at 100
-    confidence = Math.min(confidence, 100);
-    
-    console.log('Advanced parsed resume data:', resumeData);
-    return { parsedData: resumeData, confidence };
-  };
+    const lines = cleanText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const lowerText = cleanText.toLowerCase();
 
-  // Section detection algorithm
-  const detectSections = (text: string, lines: string[]): Record<string, string> => {
-    const sectionHeaders = {
-      experience: ['experience', 'work experience', 'employment', 'work history', 'professional experience'],
-      education: ['education', 'academic', 'qualifications', 'degrees'],
-      skills: ['skills', 'technical skills', 'competencies', 'technologies'],
-      projects: ['projects', 'personal projects', 'portfolio', 'project experience'],
-      certifications: ['certifications', 'certificates', 'licenses'],
-      languages: ['languages', 'language skills']
-    };
-    
-    const sections: Record<string, string> = {};
-    let currentSection = 'preamble';
-    let sectionContent: string[] = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase();
-      let foundSection = false;
-      
-      // Check if this line is a section header
-      for (const [section, headers] of Object.entries(sectionHeaders)) {
-        for (const header of headers) {
-          if (line.includes(header) && line.length - header.length < 5) {
-            // Save previous section
-            if (currentSection !== 'preamble' && sectionContent.length > 0) {
-              sections[currentSection] = sectionContent.join('\n');
-            }
-            
-            // Start new section
-            currentSection = section;
-            sectionContent = [];
-            foundSection = true;
-            break;
-          }
-        }
-        if (foundSection) break;
-      }
-      
-      if (!foundSection) {
-        sectionContent.push(lines[i]);
-      }
-    }
-    
-    // Save the last section
-    if (currentSection !== 'preamble' && sectionContent.length > 0) {
-      sections[currentSection] = sectionContent.join('\n');
-    }
-    
-    return sections;
-  };
-
-  // Improved personal info extraction
-  const extractPersonalInfo = (text: string, lines: string[]): Partial<PersonalInfo> => {
-    const info: Partial<PersonalInfo> = {};
-    
     // Extract email with multiple patterns
-    const emailMatch = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g);
-    if (emailMatch) info.email = emailMatch[0];
-
-    // Enhanced phone extraction with multiple international patterns
-    const phonePatterns = [
-      /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, // International
-      /(\+91[-.\s]?)?[6-9]\d{9}/g, // Indian mobile numbers
-      /(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}/g, // UK numbers
-      /(\+1\s?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, // US/Canada numbers
+    const emailPatterns = [
+      /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+      /email[:\s]*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/gi,
+      /e-mail[:\s]*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/gi
     ];
     
-    for (const pattern of phonePatterns) {
-      const phoneMatch = text.match(pattern);
-      if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 10) {
-        info.phone = phoneMatch[0];
+    for (const pattern of emailPatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        resumeData.personalInfo.email = match[0].replace(/^(email|e-mail)[:\s]*/i, '');
         break;
       }
     }
 
-    // Extract LinkedIn profile
-    const linkedinMatch = text.match(/(?:linkedin\.com|linkedin\/in)\/(?:#!\/)?([a-zA-Z0-9\-_]+)/i);
-    if (linkedinMatch) {
-      info.linkedin = `https://linkedin.com/in/${linkedinMatch[1]}`;
+    // Extract phone with international and Indian patterns
+    const phonePatterns = [
+      /(\+91[-.\s]?)?[6-9]\d{9}/g,
+      /(\+\d{1,3}[-.\s]?)?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}/g,
+      /phone[:\s]*(\+?\d{1,3}[-.\s]?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4})/gi,
+      /mobile[:\s]*(\+?\d{1,3}[-.\s]?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4})/gi,
+      /contact[:\s]*(\+?\d{1,3}[-.\s]?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4})/gi
+    ];
+    
+    for (const pattern of phonePatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        resumeData.personalInfo.phone = match[0].replace(/^(phone|mobile|contact)[:\s]*/i, '');
+        break;
+      }
     }
 
-    // Extract GitHub profile
-    const githubMatch = text.match(/(?:github\.com)\/([a-zA-Z0-9\-_]+)/i);
-    if (githubMatch) {
-      info.github = `https://github.com/${githubMatch[1]}`;
+    // Extract LinkedIn with multiple patterns
+    const linkedinPatterns = [
+      /linkedin\.com\/in\/[\w-]+/gi,
+      /linkedin[:\s]*([^\s\n]+)/gi,
+      /www\.linkedin\.com\/in\/[\w-]+/gi
+    ];
+    
+    for (const pattern of linkedinPatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        let linkedin = match[0].replace(/^linkedin[:\s]*/i, '');
+        if (!linkedin.startsWith('http')) {
+          linkedin = linkedin.startsWith('www.') ? `https://${linkedin}` : `https://linkedin.com/in/${linkedin.split('/').pop()}`;
+        }
+        resumeData.personalInfo.linkedin = linkedin;
+        break;
+      }
     }
 
-    // Extract portfolio website
-    const portfolioMatch = text.match(/(?:portfolio|website):?\s*(https?:\/\/[^\s]+)/i);
-    if (portfolioMatch) {
-      info.portfolio = portfolioMatch[1];
+    // Extract GitHub
+    const githubPatterns = [
+      /github\.com\/[\w-]+/gi,
+      /github[:\s]*([^\s\n]+)/gi,
+      /www\.github\.com\/[\w-]+/gi
+    ];
+    
+    for (const pattern of githubPatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        let github = match[0].replace(/^github[:\s]*/i, '');
+        if (!github.startsWith('http')) {
+          github = github.startsWith('www.') ? `https://${github}` : `https://github.com/${github.split('/').pop()}`;
+        }
+        resumeData.personalInfo.github = github;
+        break;
+      }
     }
 
-    // Enhanced name extraction using multiple heuristics
-    // Look for the largest font (often at the top) or patterns that look like names
-    if (lines.length > 0) {
-      const potentialNameLines = lines.slice(0, 3); // Name is usually at the top
-      
-      for (const line of potentialNameLines) {
-        // Name pattern: typically 2-4 words with capital letters, not all caps
-        if (line.split(/\s+/).length >= 2 && line.split(/\s+/).length <= 4 &&
-            /[A-Z]/.test(line) && !/^[A-Z\s]+$/.test(line) && 
-            !line.match(/(email|phone|linkedin|github|http)/i)) {
-          info.name = line.trim();
+    // Extract name (improved algorithm)
+    const namePatterns = [
+      // Look for name at the beginning
+      /^([A-Z][a-z]+ [A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/m,
+      // Look for name after common prefixes
+      /(?:name[:\s]*|candidate[:\s]*|applicant[:\s]*)([A-Z][a-z]+ [A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/gi
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        const name = match[1] || match[0];
+        if (name && !name.includes('@') && !name.match(/\d/) && name.split(' ').length >= 2) {
+          resumeData.personalInfo.name = name.trim();
           break;
         }
       }
     }
 
-    // Enhanced location extraction
-    const locationMatch = text.match(/(?:location|address|based in)[:\s]*([^\n,]+(?:,\s*[^\n,]+)*)/i);
-    if (locationMatch) {
-      info.location = locationMatch[1].trim();
-    } else {
-      // Try to find common location patterns
-      const cityStatePattern = /([A-Z][a-z]+(?: [A-Z][a-z]+)*),?\s+([A-Z]{2}|[A-Z][a-z]+(?: [A-Z][a-z]+)*)/;
-      const match = text.match(cityStatePattern);
-      if (match) info.location = match[0];
+    // If no name found, try first meaningful line
+    if (!resumeData.personalInfo.name) {
+      for (const line of lines.slice(0, 5)) {
+        if (line.match(/^[A-Z][a-z]+ [A-Z][a-z]+/) && 
+            !line.includes('@') && 
+            !line.match(/\d/) && 
+            line.split(' ').length >= 2 && 
+            line.split(' ').length <= 4) {
+          resumeData.personalInfo.name = line;
+          break;
+        }
+      }
     }
 
-    return info;
-  };
-
-  // Extract summary from the beginning of the document
-  const extractSummary = (lines: string[]): string => {
-    // Summary is usually in the first few lines after the name
-    let summary = '';
-    let foundName = false;
+    // Extract location
+    const locationPatterns = [
+      /(?:address|location|city)[:\s]*([^,\n]+(?:,\s*[^,\n]+)*)/gi,
+      /([A-Z][a-z]+,\s*[A-Z][a-z]+(?:,\s*\d{5,6})?)/g,
+      /(Mumbai|Delhi|Bangalore|Hyderabad|Chennai|Pune|Kolkata|Ahmedabad|Jaipur|Lucknow|Kanpur|Nagpur|Indore|Thane|Bhopal|Visakhapatnam|Pimpri|Patna|Vadodara|Ghaziabad|Ludhiana|Agra|Nashik|Faridabad|Meerut|Rajkot|Kalyan|Vasai|Varanasi|Srinagar|Aurangabad|Dhanbad|Amritsar|Navi Mumbai|Allahabad|Ranchi|Howrah|Coimbatore|Jabalpur|Gwalior|Vijayawada|Jodhpur|Madurai|Raipur|Kota|Guwahati|Chandigarh|Solapur|Hubli|Tiruchirappalli|Bareilly|Mysore|Tiruppur|Gurgaon|Aligarh|Jalandhar|Bhubaneswar|Salem|Warangal|Guntur|Bhiwandi|Saharanpur|Gorakhpur|Bikaner|Amravati|Noida|Jamshedpur|Bhilai|Cuttack|Firozabad|Kochi|Nellore|Bhavnagar|Dehradun|Durgapur|Asansol|Rourkela|Nanded|Kolhapur|Ajmer|Akola|Gulbarga|Jamnagar|Ujjain|Loni|Siliguri|Jhansi|Ulhasnagar|Jammu|Sangli-Miraj|Mangalore|Erode|Belgaum|Ambattur|Tirunelveli|Malegaon|Gaya|Jalgaon|Udaipur|Maheshtala)[,\s]*[A-Za-z\s]*(?:,\s*India)?/gi
+    ];
     
-    for (const line of lines.slice(0, 10)) { // Check first 10 lines
-      if (foundName && line.length > 30 && !line.match(/(email|phone|http|@)/i)) {
-        summary = line;
+    for (const pattern of locationPatterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        resumeData.personalInfo.location = match[0].replace(/^(address|location|city)[:\s]*/i, '').trim();
         break;
       }
-      
-      // Check if this line looks like a name
-      if (line.split(/\s+/).length >= 2 && line.split(/\s+/).length <= 4 &&
-          /[A-Z]/.test(line) && !/^[A-Z\s]+$/.test(line)) {
-        foundName = true;
+    }
+
+    // Extract professional summary with advanced patterns
+    const summaryPatterns = [
+      /(?:summary|objective|profile|about|overview)[:\s]*([^]*?)(?=\n\s*(?:experience|education|skills|employment|work|career|projects)|$)/gi,
+      /(?:professional\s+summary|career\s+objective|personal\s+statement)[:\s]*([^]*?)(?=\n\s*(?:experience|education|skills)|$)/gi
+    ];
+    
+    for (const pattern of summaryPatterns) {
+      const match = cleanText.match(pattern);
+      if (match && match[1]) {
+        const summary = match[1].trim().replace(/\s+/g, ' ');
+        if (summary.length > 30 && summary.length < 500) {
+          resumeData.personalInfo.summary = summary;
+          break;
+        }
       }
     }
-    
-    return summary;
-  };
 
-  // Improved experience extraction with context awareness
-  const extractExperience = (experienceText: string): Experience[] => {
-    const experiences: Experience[] = [];
-    const lines = experienceText.split('\n');
+    // Extract skills with comprehensive patterns
+    const skillsSection = extractSection(cleanText, ['skills', 'technical skills', 'core competencies', 'technologies', 'expertise']);
+    const commonSkills = [
+      // Programming Languages
+      'JavaScript', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'TypeScript',
+      // Web Technologies
+      'React', 'Angular', 'Vue.js', 'Node.js', 'Express.js', 'HTML', 'CSS', 'SASS', 'LESS', 'Bootstrap', 'Tailwind CSS',
+      // Databases
+      'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'SQLite', 'Oracle', 'SQL Server', 'DynamoDB',
+      // Cloud & DevOps
+      'AWS', 'Azure', 'Google Cloud', 'Docker', 'Kubernetes', 'Jenkins', 'Git', 'GitHub', 'GitLab', 'CI/CD',
+      // Frameworks & Libraries
+      'Django', 'Flask', 'Spring', 'Laravel', 'Rails', 'Next.js', 'Nuxt.js', 'Gatsby',
+      // Mobile Development
+      'React Native', 'Flutter', 'iOS', 'Android', 'Xamarin',
+      // Data & Analytics
+      'Machine Learning', 'Deep Learning', 'Data Science', 'Pandas', 'NumPy', 'TensorFlow', 'PyTorch', 'Scikit-learn',
+      // Design & Creative
+      'Photoshop', 'Illustrator', 'Figma', 'Sketch', 'Adobe XD', 'InDesign', 'After Effects',
+      // Business & Soft Skills
+      'Project Management', 'Agile', 'Scrum', 'Leadership', 'Communication', 'Problem Solving', 'Team Management',
+      // Other Technologies
+      'Linux', 'Windows', 'macOS', 'Bash', 'PowerShell', 'REST API', 'GraphQL', 'Microservices'
+    ];
     
-    let currentExp: Partial<Experience> = {};
-    let collectingDescription = false;
+    const extractedSkills = new Set<string>();
     
-    for (const line of lines) {
-      // Detect new experience entry (often has dates or position titles)
-      const hasTitle = line.match(/(senior|junior|lead|manager|director|engineer|developer|designer|analyst)/i);
-      const hasDate = line.match(/((jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4})|(\d{4}\s*[-–—]\s*(present|current|\d{4}))/i);
-      
-      if ((hasTitle || hasDate) && !collectingDescription) {
-        // Save previous experience if exists
-        if (currentExp.title && currentExp.company) {
-          experiences.push(currentExp as Experience);
-        }
-        
-        // Start new experience
-        currentExp = {};
-        
-        // Try to extract title, company, and duration
-        const titleCompanyMatch = line.match(/(.+?)(?:\s+at|\s+@|\s+,\s+|\s+-\s+)(.+)/i);
-        if (titleCompanyMatch) {
-          currentExp.title = titleCompanyMatch[1].trim();
-          currentExp.company = titleCompanyMatch[2].trim();
-        } else {
-          currentExp.title = line.trim();
-        }
-        
-        // Extract duration
-        const durationMatch = line.match(/((jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*[-–—]\s*(present|current|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}))/i);
-        if (durationMatch) {
-          currentExp.duration = durationMatch[1];
-        }
-        
-        collectingDescription = true;
-      } else if (collectingDescription) {
-        // Collect description lines
-        if (line.trim().length > 0) {
-          if (!currentExp.description) {
-            currentExp.description = line;
-          } else {
-            currentExp.description += '\n' + line;
-          }
-        } else if (currentExp.description) {
-          // Empty line might indicate end of description
-          collectingDescription = false;
+    // Check skills section first
+    if (skillsSection) {
+      for (const skill of commonSkills) {
+        if (skillsSection.toLowerCase().includes(skill.toLowerCase())) {
+          extractedSkills.add(skill);
         }
       }
     }
     
-    // Add the last experience
-    if (currentExp.title && currentExp.company) {
-      experiences.push(currentExp as Experience);
+    // Check entire text for skills
+    for (const skill of commonSkills) {
+      if (lowerText.includes(skill.toLowerCase())) {
+        extractedSkills.add(skill);
+      }
     }
     
-    return experiences;
+    // Extract skills from bullet points and lists
+    const skillBulletPattern = /[•·▪▫-]\s*([A-Za-z][A-Za-z\s.+#-]+?)(?=\s*[•·▪▫-]|\n|$)/g;
+    let match;
+    while ((match = skillBulletPattern.exec(skillsSection || cleanText)) !== null) {
+      const skill = match[1].trim();
+      if (skill.length > 2 && skill.length < 30 && !skill.includes('experience') && !skill.includes('years')) {
+        extractedSkills.add(skill);
+      }
+    }
+    
+    resumeData.skills = Array.from(extractedSkills).slice(0, 20); // Limit to 20 skills
+
+    // Extract work experience with advanced parsing
+    const experienceSection = extractSection(cleanText, ['experience', 'work experience', 'employment', 'career', 'professional experience', 'work history']);
+    if (experienceSection) {
+      const experiences = parseExperienceSection(experienceSection);
+      resumeData.experience = experiences;
+    }
+
+    // Extract education with comprehensive patterns
+    const educationSection = extractSection(cleanText, ['education', 'academic', 'qualification', 'degree', 'university', 'college']);
+    if (educationSection) {
+      const educations = parseEducationSection(educationSection);
+      resumeData.education = educations;
+    }
+
+    // Extract projects
+    const projectsSection = extractSection(cleanText, ['projects', 'portfolio', 'work samples', 'achievements']);
+    if (projectsSection) {
+      const projects = parseProjectsSection(projectsSection);
+      resumeData.projects = projects;
+    }
+
+    return resumeData;
   };
 
-  // Improved education extraction
-  const extractEducation = (educationText: string): Education[] => {
-    const educations: Education[] = [];
-    const lines = educationText.split('\n');
+  const extractSection = (text: string, keywords: string[]): string => {
+    for (const keyword of keywords) {
+      const pattern = new RegExp(`(${keyword})[:\\s]*([\\s\\S]*?)(?=\\n\\s*(?:experience|education|skills|projects|employment|work|career|qualification|degree|university|college|portfolio|achievements|references|certifications|awards|languages|interests|hobbies)|$)`, 'gi');
+      const match = text.match(pattern);
+      if (match && match[0]) {
+        return match[0];
+      }
+    }
+    return '';
+  };
+
+  const parseExperienceSection = (section: string): Array<{title: string; company: string; duration: string; description: string}> => {
+    const experiences: Array<{title: string; company: string; duration: string; description: string}> = [];
     
-    let currentEdu: Partial<Education> = {};
+    // Pattern for job entries: Title, Company, Duration, Description
+    const jobPatterns = [
+      // Pattern 1: Title\nCompany\nDuration\nDescription
+      /([A-Za-z\s&,.-]+?)\s*\n\s*([A-Za-z\s&,.-]+?)\s*\n\s*([A-Za-z\s\d\-–—\/]+?)\s*\n\s*([^]*?)(?=\n\s*[A-Z][a-z\s&,.-]+?\s*\n\s*[A-Z][a-z\s&,.-]+?\s*\n|\n\s*$|$)/gi,
+      // Pattern 2: Title at Company (Duration)
+      /([A-Za-z\s&,.-]+?)\s+at\s+([A-Za-z\s&,.-]+?)\s*\(([^)]+)\)\s*([^]*?)(?=\n\s*[A-Z][a-z\s&,.-]+?\s+at\s+|\n\s*$|$)/gi,
+      // Pattern 3: Title | Company | Duration
+      /([A-Za-z\s&,.-]+?)\s*\|\s*([A-Za-z\s&,.-]+?)\s*\|\s*([A-Za-z\s\d\-–—\/]+?)\s*\n\s*([^]*?)(?=\n\s*[A-Z][a-z\s&,.-]+?\s*\||\n\s*$|$)/gi
+    ];
     
-    for (const line of lines) {
-      // Look for degree patterns
-      const degreeMatch = line.match(/(bach|master|phd|m\.?tech|b\.?tech|m\.?sc|b\.?sc|m\.?a|b\.?a|m\.?com|b\.?com|diploma|certificate)/i);
-      const institutionMatch = line.match(/(university|college|institute|school|academy)/i);
-      const yearMatch = line.match(/(\d{4}\s*[-–—]\s*(present|current|\d{4})|\d{4})/i);
-      const gpaMatch = line.match(/(gpa|grade|score):?\s*([\d\.]+\/)?[\d\.]+/i);
-      
-      if (degreeMatch || institutionMatch) {
-        // Save previous education if exists
-        if (currentEdu.degree && currentEdu.institution) {
-          educations.push(currentEdu as Education);
+    for (const pattern of jobPatterns) {
+      let match;
+      while ((match = pattern.exec(section)) !== null) {
+        if (match[1] && match[2] && match[3]) {
+          experiences.push({
+            title: match[1].trim(),
+            company: match[2].trim(),
+            duration: match[3].trim(),
+            description: (match[4] || '').trim().substring(0, 500) // Limit description length
+          });
         }
-        
-        // Start new education
-        currentEdu = {};
-        
-        if (degreeMatch && institutionMatch) {
-          const degreePart = line.substring(0, line.search(institutionMatch[0])).trim();
-          const institutionPart = line.substring(line.search(institutionMatch[0])).trim();
+      }
+      if (experiences.length > 0) break;
+    }
+    
+    return experiences.slice(0, 5); // Limit to 5 experiences
+  };
+
+  const parseEducationSection = (section: string): Array<{degree: string; institution: string; year: string; gpa: string}> => {
+    const educations: Array<{degree: string; institution: string; year: string; gpa: string}> = [];
+    
+    const educationPatterns = [
+      // Pattern 1: Degree\nInstitution\nYear
+      /((?:bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech|diploma)[^]*?)\n\s*([^]*?(?:university|college|institute|school)[^]*?)\n\s*(\d{4}(?:\s*-\s*\d{4})?)/gi,
+      // Pattern 2: Degree from Institution (Year)
+      /((?:bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech|diploma)[^]*?)\s+from\s+([^]*?(?:university|college|institute|school)[^]*?)\s*\((\d{4}(?:\s*-\s*\d{4})?)\)/gi,
+      // Pattern 3: Degree | Institution | Year
+      /((?:bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech|diploma)[^]*?)\s*\|\s*([^]*?(?:university|college|institute|school)[^]*?)\s*\|\s*(\d{4}(?:\s*-\s*\d{4})?)/gi
+    ];
+    
+    for (const pattern of educationPatterns) {
+      let match;
+      while ((match = pattern.exec(section)) !== null) {
+        if (match[1] && match[2] && match[3]) {
+          // Extract GPA if present
+          const gpaMatch = section.match(/gpa[:\s]*(\d+\.?\d*)/gi);
+          const gpa = gpaMatch ? gpaMatch[0].replace(/gpa[:\s]*/gi, '') : '';
           
-          currentEdu.degree = degreePart;
-          currentEdu.institution = institutionPart;
-        } else if (degreeMatch) {
-          currentEdu.degree = line.trim();
-        } else if (institutionMatch) {
-          currentEdu.institution = line.trim();
-        }
-        
-        // Extract year
-        if (yearMatch) {
-          currentEdu.year = yearMatch[1];
-        }
-        
-        // Extract GPA
-        if (gpaMatch) {
-          currentEdu.gpa = gpaMatch[0].replace(/(gpa|grade|score):?\s*/i, '');
-        }
-      } else if (currentEdu.degree || currentEdu.institution) {
-        // This might be additional info for the current education entry
-        if (yearMatch && !currentEdu.year) {
-          currentEdu.year = yearMatch[1];
-        } else if (gpaMatch && !currentEdu.gpa) {
-          currentEdu.gpa = gpaMatch[0].replace(/(gpa|grade|score):?\s*/i, '');
+          educations.push({
+            degree: match[1].trim(),
+            institution: match[2].trim(),
+            year: match[3].trim(),
+            gpa: gpa
+          });
         }
       }
+      if (educations.length > 0) break;
     }
     
-    // Add the last education
-    if (currentEdu.degree && currentEdu.institution) {
-      educations.push(currentEdu as Education);
-    }
-    
-    return educations;
+    return educations.slice(0, 3); // Limit to 3 education entries
   };
 
-  // Improved skills extraction with categorization
-  const extractSkills = (skillsText: string): string[] => {
-    const skills: string[] = [];
-    const lines = skillsText.split('\n');
+  const parseProjectsSection = (section: string): Array<{name: string; description: string; technologies: string; link: string}> => {
+    const projects: Array<{name: string; description: string; technologies: string; link: string}> = [];
     
-    for (const line of lines) {
-      // Split by common separators: commas, slashes, bullets, etc.
-      const lineSkills = line.split(/[,•·\-–—\/]|(?:and|&)/)
-        .map(skill => skill.trim())
-        .filter(skill => skill.length > 1 && skill.length < 50);
-      
-      skills.push(...lineSkills);
-    }
+    const projectPatterns = [
+      // Pattern 1: Project Name\nDescription\nTechnologies
+      /([A-Za-z\s&,.-]+?)\s*\n\s*([^]*?)(?:\n\s*(?:technologies|tech stack|built with)[:\s]*([^]*?))?(?=\n\s*[A-Z][a-z\s&,.-]+?\s*\n|\n\s*$|$)/gi,
+      // Pattern 2: Project: Name - Description
+      /project[:\s]*([A-Za-z\s&,.-]+?)\s*-\s*([^]*?)(?=\n\s*project[:\s]*|\n\s*$|$)/gi
+    ];
     
-    // Remove duplicates and empty entries
-    return [...new Set(skills)].filter(skill => skill.length > 0);
-  };
-
-  // Improved projects extraction
-  const extractProjects = (projectsText: string): Project[] => {
-    const projects: Project[] = [];
-    const lines = projectsText.split('\n');
-    
-    let currentProject: Partial<Project> = {};
-    let collectingDescription = false;
-    
-    for (const line of lines) {
-      // Detect project names (often at the beginning of lines or have special formatting)
-      const isProjectTitle = line.length > 3 && line.length < 60 && 
-                            !line.match(/(http|www|@|\.com|\.org)/i) &&
-                            (line.match(/\b(project|app|system|tool|platform)\b/i) || 
-                             !line.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|[0-9]{4})/i));
-      
-      if (isProjectTitle) {
-        // Save previous project if exists
-        if (currentProject.name) {
-          projects.push(currentProject as Project);
-        }
-        
-        // Start new project
-        currentProject = { name: line.trim() };
-        collectingDescription = true;
-      } else if (collectingDescription) {
-        // Check if this line contains technologies
-        const techMatch = line.match(/(technologies|tech stack|tools):?\s*(.+)/i);
-        if (techMatch) {
-          currentProject.technologies = techMatch[2].split(/[,;]/).map(t => t.trim());
-        } else if (line.match(/(http|github|live demo)/i)) {
-          // Extract project link
-          const linkMatch = line.match(/(https?:\/\/[^\s]+)/);
-          if (linkMatch) currentProject.link = linkMatch[1];
-        } else if (line.trim().length > 0) {
-          // Add to description
-          if (!currentProject.description) {
-            currentProject.description = line;
-          } else {
-            currentProject.description += '\n' + line;
-          }
+    for (const pattern of projectPatterns) {
+      let match;
+      while ((match = pattern.exec(section)) !== null) {
+        if (match[1] && match[2]) {
+          // Extract project URL if present
+          const urlMatch = match[2].match(/(https?:\/\/[^\s]+)/);
+          const url = urlMatch ? urlMatch[0] : '';
+          
+          projects.push({
+            name: match[1].trim(),
+            description: match[2].replace(/(https?:\/\/[^\s]+)/g, '').trim().substring(0, 300),
+            technologies: (match[3] || '').trim(),
+            link: url
+          });
         }
       }
+      if (projects.length > 0) break;
     }
     
-    // Add the last project
-    if (currentProject.name) {
-      projects.push(currentProject as Project);
-    }
-    
-    return projects;
-  };
-
-  // Extract certifications
-  const extractCertifications = (certsText: string): string[] => {
-    const lines = certsText.split('\n');
-    return lines
-      .map(line => line.replace(/(certification|certificate|license):?\s*/i, '').trim())
-      .filter(line => line.length > 0);
-  };
-
-  // Extract languages
-  const extractLanguages = (langsText: string): string[] => {
-    const lines = langsText.split('\n');
-    return lines
-      .map(line => line.replace(/(languages|language):?\s*/i, '').trim())
-      .filter(line => line.length > 0);
+    return projects.slice(0, 5); // Limit to 5 projects
   };
 
   const handleManualTextProcess = async () => {
@@ -696,18 +562,14 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
     }
 
     setUploading(true);
-    setProcessingStep('Processing text...');
+    setProcessingStep('Processing text with AI...');
     
     try {
-      const startTime = performance.now();
-      const { parsedData, confidence } = await parseResumeTextAdvanced(manualText);
-      const endTime = performance.now();
-      
-      setParsingTime(Math.round(endTime - startTime));
+      setExtractedText(manualText);
+      const parsedData = await parseResumeWithAdvancedAI(manualText);
       setExtractedData(parsedData);
-      setConfidenceScore(confidence);
       setShowManualInput(false);
-      toast.success(`Resume data extracted with ${confidence}% confidence!`);
+      toast.success('Resume data extracted successfully!');
     } catch (error) {
       console.error('Error processing manual text:', error);
       toast.error('Failed to process text. Please try again.');
@@ -726,60 +588,27 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
         location: '',
         summary: '',
         linkedin: '',
-        github: '',
-        portfolio: ''
+        github: ''
       },
       experience: [{
         title: '',
         company: '',
         duration: '',
-        description: '',
-        location: ''
+        description: ''
       }],
       education: [{
         degree: '',
         institution: '',
         year: '',
-        gpa: '',
-        location: '',
-        honors: ''
+        gpa: ''
       }],
       skills: [],
-      projects: [{
-        name: '',
-        description: '',
-        technologies: [],
-        link: '',
-        duration: ''
-      }],
-      certifications: [],
-      languages: []
+      projects: []
     };
     
     onDataImported(templateData);
     toast.success('Manual entry template loaded!');
     onClose();
-  };
-
-  // Confidence indicator component
-  const ConfidenceIndicator = ({ score }: { score: number }) => {
-    let color = 'bg-red-500';
-    if (score >= 80) color = 'bg-green-500';
-    else if (score >= 60) color = 'bg-yellow-500';
-    
-    return (
-      <div className="flex items-center mt-2">
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className={`h-2.5 rounded-full ${color}`} 
-            style={{ width: `${score}%` }}
-          ></div>
-        </div>
-        <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-          {score}%
-        </span>
-      </div>
-    );
   };
 
   return (
@@ -801,10 +630,10 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Advanced Resume Import
+              Import Resume
             </h2>
             <p className="text-gray-600 dark:text-gray-300">
-              Upload your resume and our AI will extract the information
+              Upload your existing resume to auto-fill the form with AI extraction
             </p>
           </div>
           <button
@@ -833,21 +662,21 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.txt,.docx"
+                  accept=".pdf,.txt,.doc,.docx"
                   onChange={handleFileInput}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   disabled={uploading}
                 />
                 
-                <div className="flex flex-col items-center justify-center h-40">
+                <div className="flex flex-col items-center justify-center h-48">
                   <motion.div
-                    animate={{ y: uploading ? [0, -10, 0] : 0 }}
-                    transition={{ duration: 2, repeat: uploading ? Infinity : 0 }}
+                    animate={{ y: uploading ? 0 : [0, -10, 0] }}
+                    transition={{ duration: 2, repeat: uploading ? 0 : Infinity }}
                     className="relative"
                   >
                     <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
                       {uploading ? (
-                        <Brain className="w-8 h-8 text-white" />
+                        <Loader className="w-8 h-8 text-white animate-spin" />
                       ) : (
                         <Upload className="w-8 h-8 text-white" />
                       )}
@@ -855,16 +684,18 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
                   </motion.div>
                   
                   <span className="text-lg font-medium text-gray-700 dark:text-gray-200 mb-2">
-                    {uploading ? 'Processing...' : 'Drag & Drop or Click to Upload'}
+                    {uploading ? 'Processing Resume...' : 'Drag & Drop or Click to Upload'}
                   </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    PDF, TXT, or DOCX files, max 10MB
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    PDF, DOC, DOCX, or TXT files, max 10MB
                   </span>
                   
                   {uploading && (
-                    <div className="mt-4 flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="text-blue-600 text-sm">{processingStep}</span>
+                    <div className="mt-4 flex flex-col items-center space-y-2">
+                      <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+                      </div>
+                      <span className="text-blue-600 dark:text-blue-400 text-sm font-medium">{processingStep}</span>
                     </div>
                   )}
                 </div>
@@ -880,7 +711,7 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
                     className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm"
                   >
                     <FileText className="w-4 h-4" />
-                    <span>Paste Text</span>
+                    <span>Paste Resume Text</span>
                   </motion.button>
                   
                   <motion.button
@@ -895,168 +726,111 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
                 </div>
 
                 {/* Manual Text Input */}
-                <AnimatePresence>
-                  {showManualInput && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg overflow-hidden"
-                    >
-                      <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
-                        📋 Paste Your Resume Text:
-                      </h4>
-                      <textarea
-                        value={manualText}
-                        onChange={(e) => setManualText(e.target.value)}
-                        placeholder="Paste your resume text here..."
-                        className="w-full h-32 p-3 border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <div className="flex space-x-3 mt-3">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleManualTextProcess}
-                          disabled={uploading || !manualText.trim()}
-                          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm disabled:opacity-50"
-                        >
-                          <Brain className="w-4 h-4" />
-                          <span>{uploading ? 'Processing...' : 'Extract Data'}</span>
-                        </motion.button>
-                        <button
-                          onClick={() => setShowManualInput(false)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {showManualInput && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg"
+                  >
+                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
+                      📋 Paste Your Resume Text:
+                    </h4>
+                    <textarea
+                      value={manualText}
+                      onChange={(e) => setManualText(e.target.value)}
+                      placeholder="Paste your complete resume text here... Include all sections like experience, education, skills, etc."
+                      className="w-full h-40 p-3 border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <div className="flex space-x-3 mt-3">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleManualTextProcess}
+                        disabled={uploading || !manualText.trim()}
+                        className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm disabled:opacity-50"
+                      >
+                        <Brain className="w-4 h-4" />
+                        <span>{uploading ? 'Processing...' : 'Extract Data'}</span>
+                      </motion.button>
+                      <button
+                        onClick={() => setShowManualInput(false)}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </>
           ) : (
             /* Results Display */
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-green-600">
-                  <CheckCircle className="w-6 h-6" />
-                  <span className="font-semibold">Data extracted successfully!</span>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Processed in {parsingTime}ms
-                </div>
+              <div className="flex items-center space-x-2 text-green-600">
+                <CheckCircle className="w-6 h-6" />
+                <span className="font-semibold">Data extracted successfully!</span>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Extraction Confidence
-                </h3>
-                <ConfidenceIndicator score={confidenceScore} />
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  {confidenceScore >= 80 
-                    ? 'High confidence in extracted data' 
-                    : confidenceScore >= 60 
-                    ? 'Moderate confidence - please review carefully'
-                    : 'Low confidence - manual review recommended'}
-                </p>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Extracted Information
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  {/* Personal Info */}
-                  {extractedData.personalInfo.name && (
-                    <div className="flex items-center">
-                      <User className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">{extractedData.personalInfo.name}</span>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Name:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.personalInfo.name || 'Not found'}</span>
                     </div>
-                  )}
-                  
-                  {extractedData.personalInfo.email && (
-                    <div className="flex items-center">
-                      <Mail className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">{extractedData.personalInfo.email}</span>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Email:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.personalInfo.email || 'Not found'}</span>
                     </div>
-                  )}
-                  
-                  {extractedData.personalInfo.phone && (
-                    <div className="flex items-center">
-                      <Phone className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">{extractedData.personalInfo.phone}</span>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Phone:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.personalInfo.phone || 'Not found'}</span>
                     </div>
-                  )}
-                  
-                  {extractedData.personalInfo.location && (
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">{extractedData.personalInfo.location}</span>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Location:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.personalInfo.location || 'Not found'}</span>
                     </div>
-                  )}
-                  
-                  {extractedData.personalInfo.linkedin && (
-                    <div className="flex items-center">
-                      <Globe className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">LinkedIn: {extractedData.personalInfo.linkedin}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Skills:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.skills.length} skills found</span>
                     </div>
-                  )}
-                  
-                  {extractedData.personalInfo.github && (
-                    <div className="flex items-center">
-                      <Code className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-900 dark:text-white">GitHub: {extractedData.personalInfo.github}</span>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Experience:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.experience.length} entries</span>
                     </div>
-                  )}
-                  
-                  {/* Summary */}
-                  {extractedData.personalInfo.summary && (
-                    <div className="md:col-span-2 mt-2">
-                      <p className="text-gray-900 dark:text-white">
-                        {extractedData.personalInfo.summary.length > 150 
-                          ? `${extractedData.personalInfo.summary.substring(0, 150)}...` 
-                          : extractedData.personalInfo.summary}
-                      </p>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Education:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.education.length} entries</span>
                     </div>
-                  )}
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Projects:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{extractedData.projects?.length || 0} projects</span>
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Sections Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  {extractedData.experience.length > 0 && (
-                    <div className="flex flex-col items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <Briefcase className="w-6 h-6 text-blue-500 mb-1" />
-                      <span className="font-medium text-gray-900 dark:text-white">{extractedData.experience.length}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Experience</span>
+
+                {/* Preview extracted skills */}
+                {extractedData.skills.length > 0 && (
+                  <div className="mt-4">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Extracted Skills:</span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {extractedData.skills.slice(0, 10).map((skill, index) => (
+                        <span key={index} className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 px-2 py-1 rounded-full text-xs">
+                          {skill}
+                        </span>
+                      ))}
+                      {extractedData.skills.length > 10 && (
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">+{extractedData.skills.length - 10} more</span>
+                      )}
                     </div>
-                  )}
-                  
-                  {extractedData.education.length > 0 && (
-                    <div className="flex flex-col items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <BookOpen className="w-6 h-6 text-green-500 mb-1" />
-                      <span className="font-medium text-gray-900 dark:text-white">{extractedData.education.length}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Education</span>
-                    </div>
-                  )}
-                  
-                  {extractedData.skills.length > 0 && (
-                    <div className="flex flex-col items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <Code className="w-6 h-6 text-purple-500 mb-1" />
-                      <span className="font-medium text-gray-900 dark:text-white">{extractedData.skills.length}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Skills</span>
-                    </div>
-                  )}
-                  
-                  {extractedData.projects.length > 0 && (
-                    <div className="flex flex-col items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                      <FileText className="w-6 h-6 text-orange-500 mb-1" />
-                      <span className="font-medium text-gray-900 dark:text-white">{extractedData.projects.length}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Projects</span>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex space-x-4">
@@ -1067,10 +841,9 @@ const ResumeImporter: React.FC<ResumeImporterProps> = ({ onDataImported, onClose
                     onDataImported(extractedData);
                     onClose();
                   }}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Use Extracted Data
-                  <ChevronRight className="w-5 h-5 ml-2" />
                 </motion.button>
                 
                 <motion.button
