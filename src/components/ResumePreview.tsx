@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Download, Eye, Smartphone, Tablet, Monitor } from 'lucide-react';
 import { ResumeData } from '../utils/pdfGenerator';
 import { getTemplateById } from '../data/resumeTemplates';
-import TemplateRenderer from './TemplateRenderer';
+import { generateResumePDF } from '../utils/pdfGenerator';
 import jsPDF from 'jspdf';
 
 interface ResumePreviewProps {
@@ -37,6 +37,9 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
     }
   };
 
+  const handleDownloadResume = () => {
+    generateResumePDF(resumeData, templateId);
+  };
   const handleDownloadReport = () => {
     const doc = new jsPDF();
     doc.setFont('helvetica', 'bold');
@@ -123,6 +126,95 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
     doc.save('AI_Resume_Report.pdf');
   };
 
+  // Generate preview HTML that matches the PDF output
+  const generatePreviewHTML = () => {
+    const primaryColor = template.colors.primary;
+    const secondaryColor = template.colors.secondary;
+    const textColor = template.colors.text;
+    
+    return `
+      <div style="font-family: 'Inter', sans-serif; background: white; color: ${textColor}; padding: 40px; max-width: 800px; margin: 0 auto;">
+        <!-- Header with gradient background -->
+        <div style="background: ${primaryColor}; color: white; padding: 40px; text-align: center; border-radius: 0; margin: -40px -40px 30px -40px;">
+          <h1 style="font-size: 2.5rem; font-weight: bold; margin: 0 0 10px 0;">${resumeData.personalInfo.name || 'Your Name'}</h1>
+          <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; font-size: 0.9rem; margin-top: 15px;">
+            ${resumeData.personalInfo.email ? `<span>📧 ${resumeData.personalInfo.email}</span>` : ''}
+            ${resumeData.personalInfo.phone ? `<span>📱 ${resumeData.personalInfo.phone}</span>` : ''}
+            ${resumeData.personalInfo.location ? `<span>📍 ${resumeData.personalInfo.location}</span>` : ''}
+          </div>
+          ${resumeData.personalInfo.linkedin || resumeData.personalInfo.github ? `
+          <div style="display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 0.9rem;">
+            ${resumeData.personalInfo.linkedin ? `<span>🔗 ${resumeData.personalInfo.linkedin}</span>` : ''}
+            ${resumeData.personalInfo.github ? `<span>💻 ${resumeData.personalInfo.github}</span>` : ''}
+          </div>
+          ` : ''}
+        </div>
+        
+        ${resumeData.personalInfo.summary ? `
+        <section style="margin-bottom: 30px;">
+          <h2 style="color: ${primaryColor}; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; border-bottom: 2px solid ${primaryColor}; padding-bottom: 5px;">Professional Summary</h2>
+          <p style="line-height: 1.6; font-size: 0.95rem;">${resumeData.personalInfo.summary}</p>
+        </section>
+        ` : ''}
+        
+        ${resumeData.experience.length > 0 ? `
+        <section style="margin-bottom: 30px;">
+          <h2 style="color: ${primaryColor}; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; border-bottom: 2px solid ${primaryColor}; padding-bottom: 5px;">Work Experience</h2>
+          ${resumeData.experience.map(exp => `
+            <div style="margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="color: ${primaryColor}; font-size: 1.1rem; font-weight: bold; margin: 0;">${exp.title}</h3>
+                <span style="font-size: 0.9rem; color: ${textColor};">${exp.duration}</span>
+              </div>
+              <p style="color: ${secondaryColor}; font-weight: bold; margin: 0 0 8px 0; font-size: 1rem;">${exp.company}</p>
+              <p style="line-height: 1.5; font-size: 0.9rem; margin: 0;">${exp.description}</p>
+            </div>
+          `).join('')}
+        </section>
+        ` : ''}
+        
+        ${resumeData.education.length > 0 ? `
+        <section style="margin-bottom: 30px;">
+          <h2 style="color: ${primaryColor}; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; border-bottom: 2px solid ${primaryColor}; padding-bottom: 5px;">Education</h2>
+          ${resumeData.education.map(edu => `
+            <div style="margin-bottom: 15px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="color: ${primaryColor}; font-size: 1rem; font-weight: bold; margin: 0;">${edu.degree}</h3>
+                <span style="font-size: 0.9rem; color: ${textColor};">${edu.year}</span>
+              </div>
+              <p style="font-size: 0.95rem; margin: 0; color: ${textColor};">${edu.institution}${edu.gpa ? ` | GPA: ${edu.gpa}` : ''}</p>
+            </div>
+          `).join('')}
+        </section>
+        ` : ''}
+        
+        ${resumeData.skills.length > 0 ? `
+        <section style="margin-bottom: 30px;">
+          <h2 style="color: ${primaryColor}; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; border-bottom: 2px solid ${primaryColor}; padding-bottom: 5px;">Technical Skills</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            ${resumeData.skills.map(skill => `
+              <span style="background: ${primaryColor}; color: white; padding: 6px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold;">${skill}</span>
+            `).join('')}
+          </div>
+        </section>
+        ` : ''}
+        
+        ${resumeData.projects && resumeData.projects.length > 0 ? `
+        <section style="margin-bottom: 30px;">
+          <h2 style="color: ${primaryColor}; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; border-bottom: 2px solid ${primaryColor}; padding-bottom: 5px;">Projects</h2>
+          ${resumeData.projects.map(project => `
+            <div style="margin-bottom: 20px;">
+              <h3 style="color: ${primaryColor}; font-size: 1rem; font-weight: bold; margin: 0 0 5px 0;">${project.name}</h3>
+              <p style="line-height: 1.5; font-size: 0.9rem; margin: 0 0 5px 0;">${project.description}</p>
+              ${project.technologies ? `<p style="color: ${secondaryColor}; font-size: 0.8rem; font-style: italic; margin: 0;">Technologies: ${project.technologies}</p>` : ''}
+              ${project.link ? `<p style="color: ${primaryColor}; font-size: 0.8rem; margin: 5px 0 0 0;">🔗 ${project.link}</p>` : ''}
+            </div>
+          `).join('')}
+        </section>
+        ` : ''}
+      </div>
+    `;
+  };
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -176,13 +268,22 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleDownloadReport}
+              onClick={handleDownloadResume}
               className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Download className="w-5 h-5" />
-              <span>Download PDF</span>
+              <span>Download Resume</span>
             </motion.button>
 
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleDownloadReport}
+              className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Download className="w-5 h-5" />
+              <span>AI Report</span>
+            </motion.button>
             <button
               aria-label="Close preview"
               onClick={onClose}
@@ -198,10 +299,9 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           <div className="flex justify-center">
             <div className={`${getPreviewClasses()} bg-white shadow-2xl rounded-lg overflow-hidden transition-all duration-300`}>
               <div className="w-full h-full overflow-auto">
-                <TemplateRenderer 
-                  templateId={templateId} 
-                  resumeData={resumeData} 
-                  preview={true} 
+                <div 
+                  dangerouslySetInnerHTML={{ __html: generatePreviewHTML() }}
+                  className="w-full h-full"
                 />
               </div>
             </div>
